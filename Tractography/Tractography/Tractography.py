@@ -28,9 +28,12 @@ from dipy.tracking.streamlinespeed import length
 from dipy.tracking import utils as track_utils
 import nibabel as nib
 import numpy as np
+import warnings
 
-from scilpy.reconst.utils import (find_order_from_nb_coeff,
-                                  get_b_matrix, get_maximas)
+from dipy.direction.peaks import peak_directions
+from dipy.reconst.shm import sph_harm_lookup
+# from scilpy.reconst.utils import (find_order_from_nb_coeff,
+#                                   get_b_matrix, get_maximas)
 
 from dipy.tracking.stopping_criterion import BinaryStoppingCriterion
 from dipy.io.stateful_tractogram import StatefulTractogram, Space
@@ -261,7 +264,7 @@ class TractographyWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         """Run processing when user clicks "Apply" button."""
         with slicer.util.tryWithErrorDisplay(_("Failed to compute results."), waitCursor=True):
             # Compute output
-            self.logic.process(self.ui.inputSelector.currentNode(), self.ui.invertedInputSelector.currentNode(), self.ui.outputSelector.currentNode(),
+            self.logic.process(self.ui.inputSelector.currentNode(), self.ui.invertedInputSelector.currentNode(), "trk_1061_mrm_detT.trk",
                             self.ui.invertOutputCheckBox.checked)
 
 #
@@ -278,6 +281,47 @@ class TractographyLogic(ScriptedLoadableModuleLogic):
 
     def getParameterNode(self):
         return TractographyParameterNode(super().getParameterNode())
+    
+    def find_order_from_nb_coeff(data):
+        if isinstance(data, np.ndarray):
+            shape = data.shape
+        else:
+            shape = data
+        return int((-3 + np.sqrt(1 + 8 * shape[-1])) / 2)
+    
+
+    def _honor_authorsnames_sh_basis(sh_basis_type):
+        sh_basis = sh_basis_type
+        if sh_basis_type == 'fibernav':
+            sh_basis = 'descoteaux07'
+            warnings.warn("'fibernav' sph basis name is deprecated and will be "
+                        "discontinued in favor of 'descoteaux07'.",
+                        DeprecationWarning)
+        elif sh_basis_type == 'mrtrix':
+            sh_basis = 'tournier07'
+            warnings.warn("'mrtrix' sph basis name is deprecated and will be "
+                        "discontinued in favor of 'tournier07'.",
+                        DeprecationWarning)
+        return sh_basis
+
+    
+    def get_b_matrix(self, order, sphere, sh_basis_type, return_all=False):
+        sh_basis = self._honor_authorsnames_sh_basis(sh_basis_type)
+        sph_harm_basis = sph_harm_lookup.get(sh_basis)
+        if sph_harm_basis is None:
+            raise ValueError("Invalid basis name.")
+        b_matrix, m, n = sph_harm_basis(order, sphere.theta, sphere.phi)
+        if return_all:
+            return b_matrix, m, n
+        return b_matrix
+
+
+    def get_maximas(data, sphere, b_matrix, threshold, absolute_threshold,
+                    min_separation_angle=25):
+        spherical_func = np.dot(data, b_matrix.T)
+        spherical_func[np.nonzero(spherical_func < absolute_threshold)] = 0.
+        return peak_directions(
+            spherical_func, sphere, threshold, min_separation_angle)
 
     def process(self,
                 inputVolume: vtkMRMLScalarVolumeNode,
@@ -288,6 +332,12 @@ class TractographyLogic(ScriptedLoadableModuleLogic):
                 npv: int = 7,
                 verbose: bool = False) -> None:
         
+
+        print("The inputVolume is ", inputVolume)
+        print("The inputVolume2 is, ", inputVolume2)
+        print("The outputTrkFilePath is, ", outputTrkFilePath)
+
+
         if not inputVolume or not inputVolume2:
             raise ValueError("Input or output volume is invalid")
 
@@ -296,10 +346,11 @@ class TractographyLogic(ScriptedLoadableModuleLogic):
         startTime = time.time()
         logging.info("Processing started")
 
-            # Convert Slicer volumes to numpy arrays
+        # Convert Slicer volumes to numpy arrays
         fodf_data = slicer.util.arrayFromVolume(inputVolume).astype(np.float32)
         seed_mask_data = slicer.util.arrayFromVolume(inputVolume2).astype(np.float32)
 
+        print("Shape of fodf_data:", fodf_data.shape)
       
         affine = np.eye(4)
 
@@ -369,12 +420,12 @@ class TractographyLogic(ScriptedLoadableModuleLogic):
                 peak_dirs = np.zeros(odf_shape_3d + (npeaks, 3))
                 peak_values = np.zeros(odf_shape_3d + (npeaks,))
                 peak_indices = np.full(odf_shape_3d + (npeaks,), -1, dtype='int')
-                b_matrix = get_b_matrix(
-                    find_order_from_nb_coeff(fodf_data), sphere, sh_basis)
+                b_matrix = self.get_b_matrix(self,
+                    self.find_order_from_nb_coeff(fodf_data), sphere, sh_basis)
 
                 for idx in np.argwhere(np.sum(fodf_data, axis=-1)):
                     idx = tuple(idx)
-                    directions, values, indices = get_maximas(fodf_data[idx],
+                    directions, values, indices = self.get_maximas(fodf_data[idx],
                                                             sphere, b_matrix,
                                                             sf_threshold, 0)
                     if values.shape[0] != 0:
