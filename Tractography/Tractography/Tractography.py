@@ -1,8 +1,10 @@
 import logging
 import os
 from typing import Annotated, Optional
+from __main__ import vtk, qt, ctk, slicer
 
 import vtk
+# from vtk.util import numpy_support
 
 import slicer
 from slicer.i18n import tr as _
@@ -145,9 +147,6 @@ class TractographyParameterNode:
 
 
 class TractographyWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
-    """Uses ScriptedLoadableModuleWidget base class, available at:
-    https://github.com/Slicer/Slicer/blob/main/Base/Python/slicer/ScriptedLoadableModule.py
-    """
 
     def __init__(self, parent=None) -> None:
         """Called when the user opens the module the first time and the widget is initialized."""
@@ -161,15 +160,31 @@ class TractographyWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         """Called when the user opens the module the first time and the widget is initialized."""
         ScriptedLoadableModuleWidget.setup(self)
 
-        # Load widget from .ui file (created by Qt Designer).
-        # Additional widgets can be instantiated manually and added to self.layout.
+        # Collapsible button
+        self.importCollapsibleButton = ctk.ctkCollapsibleButton()
+        self.importCollapsibleButton.text = "Import FODF NIfTI"
+        self.layout.addWidget(self.importCollapsibleButton)
+        
+        # Layout within the dummy collapsible button
+        self.formLayout = qt.QFormLayout(self.importCollapsibleButton)
+
+        # Add input directory selector for NIfTI file
+        self.niftiSelector = ctk.ctkPathLineEdit()
+        self.niftiSelector.filters = ctk.ctkPathLineEdit.Files
+        self.formLayout.addRow("Input NIfTI File:", self.niftiSelector)
+
+        # Add output node selector
+        self.outputNodeSelector = slicer.qMRMLNodeComboBox()
+        self.outputNodeSelector.nodeTypes = ['vtkMRMLMultiVolumeNode']
+        self.outputNodeSelector.setMRMLScene(slicer.mrmlScene)
+        self.outputNodeSelector.addEnabled = 1
+        self.formLayout.addRow("Output Node:", self.outputNodeSelector)
+
+
         uiWidget = slicer.util.loadUI(self.resourcePath("UI/Tractography.ui"))
         self.layout.addWidget(uiWidget)
         self.ui = slicer.util.childWidgetVariables(uiWidget)
 
-        # Set scene in MRML widgets. Make sure that in Qt designer the top-level qMRMLWidget's
-        # "mrmlSceneChanged(vtkMRMLScene*)" signal in is connected to each MRML widget's.
-        # "setMRMLScene(vtkMRMLScene*)" slot.
         uiWidget.setMRMLScene(slicer.mrmlScene)
         self.ui.invertedInputSelector.setMRMLScene(slicer.mrmlScene)
 
@@ -236,10 +251,6 @@ class TractographyWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
                 self._parameterNode.inputVolume2 = firstVolumeNode
 
     def setParameterNode(self, inputParameterNode: Optional[TractographyParameterNode]) -> None:
-        """
-        Set and observe parameter node.
-        Observation is needed because when the parameter node is changed then the GUI must be updated immediately.
-        """
 
         if self._parameterNode:
             self._parameterNode.disconnectGui(self._parameterNodeGuiTag)
@@ -259,38 +270,93 @@ class TractographyWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         else:
             self.ui.applyButton.toolTip = _("Select input and output volume nodes")
             self.ui.applyButton.enabled = False
+        
+    # def onImportButtonClicked(self):
+    #     niftiFilePath = self.niftiSelector.currentPath
+    #     mvNode = self.outputNodeSelector.currentNode()
+
+    #     if not mvNode or not os.path.exists(niftiFilePath):
+    #         slicer.util.errorDisplay("Invalid input NIfTI file or output node.")
+    #         return
+
+    #     self.read4DFODFNIfTI(mvNode, niftiFilePath)
 
     def onApplyButton(self) -> None:
         """Run processing when user clicks "Apply" button."""
+
+        mvNode = self.outputNodeSelector.currentNode()
+        niftiFilePath = self.niftiSelector.currentPath
+        
         with slicer.util.tryWithErrorDisplay(_("Failed to compute results."), waitCursor=True):
             # Compute output
-            self.logic.process(self.ui.inputSelector.currentNode(), self.ui.invertedInputSelector.currentNode(), "trk_1061_mrm_detT.trk",
+            self.logic.process(self.ui.inputSelector.currentNode(), self.ui.invertedInputSelector.currentNode(), mvNode, "trk_1061_mrm_detT.trk", niftiFilePath,
                             self.ui.invertOutputCheckBox.checked)
 
 #
 # TractographyLogic
 #
 
-
 class TractographyLogic(ScriptedLoadableModuleLogic):
     
 
     def __init__(self) -> None:
-        """Called when the logic class is instantiated. Can be used for initializing member variables."""
         ScriptedLoadableModuleLogic.__init__(self)
 
     def getParameterNode(self):
         return TractographyParameterNode(super().getParameterNode())
     
-    def find_order_from_nb_coeff(data):
+    def find_order_from_nb_coeff(self, data):
         if isinstance(data, np.ndarray):
             shape = data.shape
         else:
             shape = data
         return int((-3 + np.sqrt(1 + 8 * shape[-1])) / 2)
     
+    def readFODFNIfTI(self, mvNode, niftiFilePath):
+        """Read a 4D NIfTI file containing spherical harmonics as multivolume."""
 
-    def _honor_authorsnames_sh_basis(sh_basis_type):
+        # Use VTK's NIfTI reader to load the 4D NIfTI file
+        reader = vtk.vtkNIFTIImageReader()
+        reader.SetFileName(niftiFilePath)
+        reader.SetTimeAsVector(True)  # Use the 4th dimension
+        reader.Update()
+        
+        nFrames = reader.GetTimeDimension()
+
+        if nFrames < 1:
+            slicer.util.errorDisplay("Invalid 4D NIfTI file: no frames detected.")
+            return
+
+        print(f"Successfully read {nFrames} spherical harmonics frames from the FODF NIfTI file.")
+
+        # Display message with the number of frames (SH coefficients)
+        mvNode.SetName(f"{nFrames} frames NIfTI MultiVolume")
+        slicer.util.infoDisplay(f"Successfully imported {nFrames} frames from the FODF NIfTI file.")
+
+        # Process and store the FODF data
+        mvImage = reader.GetOutputDataObject(0)
+
+        # Create and configure the MultiVolume display node
+        mvDisplayNode = slicer.mrmlScene.CreateNodeByClass('vtkMRMLMultiVolumeDisplayNode')
+        mvDisplayNode.SetScene(slicer.mrmlScene)
+        slicer.mrmlScene.AddNode(mvDisplayNode)
+        mvDisplayNode.SetDefaultColorMap()
+
+        # Set the image data and display node for the multivolume node
+        mvNode.SetAndObserveImageData(mvImage)
+        mvNode.SetAndObserveDisplayNodeID(mvDisplayNode.GetID())
+        mvNode.SetNumberOfFrames(nFrames)
+
+        print(f"Output node configured with {nFrames} frames.")
+
+        # Optionally, you can add the logic to handle frame labels or SH-specific attributes
+
+        # Return the number of frames (spherical harmonics coefficients)
+        return nFrames
+
+    
+
+    def _honor_authorsnames_sh_basis(self, sh_basis_type):
         sh_basis = sh_basis_type
         if sh_basis_type == 'fibernav':
             sh_basis = 'descoteaux07'
@@ -316,7 +382,7 @@ class TractographyLogic(ScriptedLoadableModuleLogic):
         return b_matrix
 
 
-    def get_maximas(data, sphere, b_matrix, threshold, absolute_threshold,
+    def get_maximas(self, data, sphere, b_matrix, threshold, absolute_threshold,
                     min_separation_angle=25):
         spherical_func = np.dot(data, b_matrix.T)
         spherical_func[np.nonzero(spherical_func < absolute_threshold)] = 0.
@@ -326,17 +392,20 @@ class TractographyLogic(ScriptedLoadableModuleLogic):
     def process(self,
                 inputVolume: vtkMRMLScalarVolumeNode,
                 inputVolume2: vtkMRMLScalarVolumeNode,
+                mvNode: vtkMRMLScalarVolumeNode,
                 outputTrkFilePath: str,             
+                niftiFilePath: str,             
                 step_size: float = 0.2,
                 algorithm: str = 'det',
                 npv: int = 7,
-                verbose: bool = False) -> None:
+                verbose: bool = False,
+                ) -> None:
         
 
         print("The inputVolume is ", inputVolume)
-        print("The inputVolume2 is, ", inputVolume2)
-        print("The outputTrkFilePath is, ", outputTrkFilePath)
-
+        print("The inputVolume is, ", inputVolume2)
+        print("The niftiFilePath is ", niftiFilePath)
+        # print("The outputTrkFilePath is, ", outputTrkFilePath)
 
         if not inputVolume or not inputVolume2:
             raise ValueError("Input or output volume is invalid")
@@ -347,10 +416,25 @@ class TractographyLogic(ScriptedLoadableModuleLogic):
         logging.info("Processing started")
 
         # Convert Slicer volumes to numpy arrays
+        frames = self.readFODFNIfTI(mvNode, niftiFilePath)
         fodf_data = slicer.util.arrayFromVolume(inputVolume).astype(np.float32)
+        
+        # vtk_image_data = inputVolume.GetImageData()
+        # dimensions = vtk_image_data.GetDimensions()
+        # print("Dimensions of the input volume:", dimensions)  # Check the dimensions
+        # vtk_array = vtk_image_data.GetPointData().GetScalars()
+        # numpy_data = numpy_support.vtk_to_numpy(vtk_array)
+        # x, y, z = dimensions[:3]
+        # sh_coeff_count = numpy_data.size // (x * y * z)
+        # numpy_data_reshaped = numpy_data.reshape((x, y, z, sh_coeff_count))
+        # print("Reshaped numpy data to 4D:", numpy_data_reshaped.shape)
+
         seed_mask_data = slicer.util.arrayFromVolume(inputVolume2).astype(np.float32)
 
-        print("Shape of fodf_data:", fodf_data.shape)
+        fodf_4d = np.reshape(fodf_data, (fodf_data.shape[2], fodf_data.shape[1], fodf_data.shape[0], frames))
+
+        print("Shape of fodf_data:", fodf_4d.shape)
+        print("the dimensions of fodf : ", frames)
       
         affine = np.eye(4)
 
@@ -372,12 +456,12 @@ class TractographyLogic(ScriptedLoadableModuleLogic):
         stopping_criterion = BinaryStoppingCriterion(mask_data)
 
         sphere = HemiSphere.from_sphere(get_sphere('symmetric724'))
-        theta = 45.0  # Angular threshold in degrees; adjust as needed
-        sh_basis = 'tournier07'  # Adjust if necessary
-        sf_threshold = 0.1  # Relative peak threshold; adjust as needed
+        theta = 45.0
+        sh_basis = 'tournier07'  
+        sf_threshold = 0.1  
 
-        non_zeros_count = np.count_nonzero(np.sum(fodf_data, axis=-1))
-        non_first_val_count = np.count_nonzero(np.argmax(fodf_data, axis=-1))
+        non_zeros_count = np.count_nonzero(np.sum(fodf_4d, axis=-1))
+        non_first_val_count = np.count_nonzero(np.argmax(fodf_4d, axis=-1))
 
         if algorithm in ['det', 'prob']:
             if non_first_val_count / non_zeros_count > 0.5:
@@ -387,13 +471,13 @@ class TractographyLogic(ScriptedLoadableModuleLogic):
             else:
                 dg_class = ProbabilisticDirectionGetter
             direction_getter = dg_class.from_shcoeff(
-                shcoeff=fodf_data,
+                shcoeff=fodf_4d,
                 max_angle=theta,
                 sphere=sphere,
                 basis_type=sh_basis,
                 relative_peak_threshold=sf_threshold)
         elif algorithm == 'eudx':
-            odf_shape_3d = fodf_data.shape[:-1]
+            odf_shape_3d = fodf_4d.shape[:-1]
             dg = PeaksAndMetrics()
             dg.sphere = sphere
             dg.ang_thr = theta
@@ -401,19 +485,19 @@ class TractographyLogic(ScriptedLoadableModuleLogic):
 
             if non_first_val_count / non_zeros_count > 0.5:
                 logging.info('Input detected as peaks.')
-                nb_peaks = fodf_data.shape[-1] // 3
+                nb_peaks = fodf_4d.shape[-1] // 3
                 slices = np.arange(0, nb_peaks * 3 + 1, 3)
                 peak_values = np.zeros(odf_shape_3d + (nb_peaks,))
                 peak_indices = np.zeros(odf_shape_3d + (nb_peaks,))
 
-                for idx in np.argwhere(np.sum(fodf_data, axis=-1)):
+                for idx in np.argwhere(np.sum(fodf_4d, axis=-1)):
                     idx = tuple(idx)
                     for i in range(nb_peaks):
-                        vec = fodf_data[idx][slices[i]:slices[i+1]]
+                        vec = fodf_4d[idx][slices[i]:slices[i+1]]
                         peak_values[idx][i] = np.linalg.norm(vec, axis=-1)
                         peak_indices[idx][i] = sphere.find_closest(vec)
 
-                dg.peak_dirs = fodf_data
+                dg.peak_dirs = fodf_4d
             else:
                 logging.info('Input detected as fodf.')
                 npeaks = 5
@@ -421,11 +505,11 @@ class TractographyLogic(ScriptedLoadableModuleLogic):
                 peak_values = np.zeros(odf_shape_3d + (npeaks,))
                 peak_indices = np.full(odf_shape_3d + (npeaks,), -1, dtype='int')
                 b_matrix = self.get_b_matrix(self,
-                    self.find_order_from_nb_coeff(fodf_data), sphere, sh_basis)
+                    self.find_order_from_nb_coeff(fodf_4d), sphere, sh_basis)
 
-                for idx in np.argwhere(np.sum(fodf_data, axis=-1)):
+                for idx in np.argwhere(np.sum(fodf_4d, axis=-1)):
                     idx = tuple(idx)
-                    directions, values, indices = self.get_maximas(fodf_data[idx],
+                    directions, values, indices = self.get_maximas(fodf_4d[idx],
                                                             sphere, b_matrix,
                                                             sf_threshold, 0)
                     if values.shape[0] != 0:
@@ -460,7 +544,7 @@ class TractographyLogic(ScriptedLoadableModuleLogic):
             random_seed=None,
             save_seeds=False)
 
-        min_length = 10.0  # Minimum length in mm; adjust as needed
+        min_length = 10.0
         scaled_min_length = min_length / voxel_size
         scaled_max_length = max_length / voxel_size
 
@@ -485,49 +569,3 @@ class TractographyLogic(ScriptedLoadableModuleLogic):
 # TractographyTest
 #
 
-
-class TractographyTest(ScriptedLoadableModuleTest):
-    """
-    This is the test case for your scripted module.
-    Uses ScriptedLoadableModuleTest base class, available at:
-    https://github.com/Slicer/Slicer/blob/main/Base/Python/slicer/ScriptedLoadableModule.py
-    """
-
-    def setUp(self):
-        """Do whatever is needed to reset the state - typically a scene clear will be enough."""
-        slicer.mrmlScene.Clear()
-
-    def runTest(self):
-        """Run as few or as many tests as needed here."""
-        self.setUp()
-        self.test_Tractography1()
-
-    def test_Tractography1(self):
-        
-        self.delayDisplay("Starting the test")
-        import SampleData
-
-        registerSampleData()
-        inputVolume = SampleData.downloadSample("Tractography1")
-        self.delayDisplay("Loaded test data set")
-
-        inputScalarRange = inputVolume.GetImageData().GetScalarRange()
-        self.assertEqual(inputScalarRange[0], 0)
-        self.assertEqual(inputScalarRange[1], 695)
-
-        outputVolume = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLScalarVolumeNode")
-        threshold = 100
-
-        logic = TractographyLogic()
-
-        logic.process(inputVolume, outputVolume, threshold, True)
-        outputScalarRange = outputVolume.GetImageData().GetScalarRange()
-        self.assertEqual(outputScalarRange[0], inputScalarRange[0])
-        self.assertEqual(outputScalarRange[1], threshold)
-
-        logic.process(inputVolume, outputVolume, threshold, False)
-        outputScalarRange = outputVolume.GetImageData().GetScalarRange()
-        self.assertEqual(outputScalarRange[0], inputScalarRange[0])
-        self.assertEqual(outputScalarRange[1], inputScalarRange[1])
-
-        self.delayDisplay("Test passed")
