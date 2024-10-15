@@ -19,6 +19,7 @@ from slicer.parameterNodeWrapper import (
 
 import logging
 
+from dipy.io.image import load_nifti
 from dipy.core.sphere import HemiSphere
 from dipy.data import get_sphere
 from dipy.direction import (DeterministicMaximumDirectionGetter,
@@ -27,6 +28,7 @@ from dipy.direction.peaks import PeaksAndMetrics
 from dipy.tracking.local_tracking import LocalTracking
 from dipy.tracking.stopping_criterion import BinaryStoppingCriterion
 from dipy.tracking.streamlinespeed import length
+from dipy.io.streamline import save_trk
 from dipy.tracking import utils as track_utils
 import nibabel as nib
 import numpy as np
@@ -289,8 +291,7 @@ class TractographyWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         
         with slicer.util.tryWithErrorDisplay(_("Failed to compute results."), waitCursor=True):
             # Compute output
-            self.logic.process(self.ui.inputSelector.currentNode(), self.ui.invertedInputSelector.currentNode(), mvNode, "trk_1061_mrm_detT.trk", niftiFilePath,
-                            self.ui.invertOutputCheckBox.checked)
+            self.logic.process(self.ui.inputSelector.currentNode(), self.ui.invertedInputSelector.currentNode(), mvNode, "trk_1061_mrm_detT.trk", niftiFilePath)
 
 #
 # TractographyLogic
@@ -323,15 +324,11 @@ class TractographyLogic(ScriptedLoadableModuleLogic):
         
         nFrames = reader.GetTimeDimension()
 
-        if nFrames < 1:
-            slicer.util.errorDisplay("Invalid 4D NIfTI file: no frames detected.")
-            return
-
+    
         print(f"Successfully read {nFrames} spherical harmonics frames from the FODF NIfTI file.")
 
         # Display message with the number of frames (SH coefficients)
         mvNode.SetName(f"{nFrames} frames NIfTI MultiVolume")
-        slicer.util.infoDisplay(f"Successfully imported {nFrames} frames from the FODF NIfTI file.")
 
         # Process and store the FODF data
         mvImage = reader.GetOutputDataObject(0)
@@ -416,25 +413,16 @@ class TractographyLogic(ScriptedLoadableModuleLogic):
         logging.info("Processing started")
 
         # Convert Slicer volumes to numpy arrays
-        frames = self.readFODFNIfTI(mvNode, niftiFilePath)
-        fodf_data = slicer.util.arrayFromVolume(inputVolume).astype(np.float32)
+        # frames = self.readFODFNIfTI(mvNode, niftiFilePath)
+        data, aff, img = load_nifti(niftiFilePath, return_img=True)
+        fodf_data = data.astype(np.float32)
         
-        # vtk_image_data = inputVolume.GetImageData()
-        # dimensions = vtk_image_data.GetDimensions()
-        # print("Dimensions of the input volume:", dimensions)  # Check the dimensions
-        # vtk_array = vtk_image_data.GetPointData().GetScalars()
-        # numpy_data = numpy_support.vtk_to_numpy(vtk_array)
-        # x, y, z = dimensions[:3]
-        # sh_coeff_count = numpy_data.size // (x * y * z)
-        # numpy_data_reshaped = numpy_data.reshape((x, y, z, sh_coeff_count))
-        # print("Reshaped numpy data to 4D:", numpy_data_reshaped.shape)
-
         seed_mask_data = slicer.util.arrayFromVolume(inputVolume2).astype(np.float32)
 
-        fodf_4d = np.reshape(fodf_data, (fodf_data.shape[2], fodf_data.shape[1], fodf_data.shape[0], frames))
+        # fodf_data = np.reshape(fodf_data, (fodf_data.shape[2], fodf_data.shape[1], fodf_data.shape[0], frames))
 
-        print("Shape of fodf_data:", fodf_4d.shape)
-        print("the dimensions of fodf : ", frames)
+        print("Shape of fodf_data:", fodf_data.shape)
+        # print("the dimensions of fodf : ", frames)
       
         affine = np.eye(4)
 
@@ -460,8 +448,8 @@ class TractographyLogic(ScriptedLoadableModuleLogic):
         sh_basis = 'tournier07'  
         sf_threshold = 0.1  
 
-        non_zeros_count = np.count_nonzero(np.sum(fodf_4d, axis=-1))
-        non_first_val_count = np.count_nonzero(np.argmax(fodf_4d, axis=-1))
+        non_zeros_count = np.count_nonzero(np.sum(fodf_data, axis=-1))
+        non_first_val_count = np.count_nonzero(np.argmax(fodf_data, axis=-1))
 
         if algorithm in ['det', 'prob']:
             if non_first_val_count / non_zeros_count > 0.5:
@@ -471,13 +459,13 @@ class TractographyLogic(ScriptedLoadableModuleLogic):
             else:
                 dg_class = ProbabilisticDirectionGetter
             direction_getter = dg_class.from_shcoeff(
-                shcoeff=fodf_4d,
+                shcoeff=fodf_data,
                 max_angle=theta,
                 sphere=sphere,
                 basis_type=sh_basis,
                 relative_peak_threshold=sf_threshold)
         elif algorithm == 'eudx':
-            odf_shape_3d = fodf_4d.shape[:-1]
+            odf_shape_3d = fodf_data.shape[:-1]
             dg = PeaksAndMetrics()
             dg.sphere = sphere
             dg.ang_thr = theta
@@ -485,19 +473,19 @@ class TractographyLogic(ScriptedLoadableModuleLogic):
 
             if non_first_val_count / non_zeros_count > 0.5:
                 logging.info('Input detected as peaks.')
-                nb_peaks = fodf_4d.shape[-1] // 3
+                nb_peaks = fodf_data.shape[-1] // 3
                 slices = np.arange(0, nb_peaks * 3 + 1, 3)
                 peak_values = np.zeros(odf_shape_3d + (nb_peaks,))
                 peak_indices = np.zeros(odf_shape_3d + (nb_peaks,))
 
-                for idx in np.argwhere(np.sum(fodf_4d, axis=-1)):
+                for idx in np.argwhere(np.sum(fodf_data, axis=-1)):
                     idx = tuple(idx)
                     for i in range(nb_peaks):
-                        vec = fodf_4d[idx][slices[i]:slices[i+1]]
+                        vec = fodf_data[idx][slices[i]:slices[i+1]]
                         peak_values[idx][i] = np.linalg.norm(vec, axis=-1)
                         peak_indices[idx][i] = sphere.find_closest(vec)
 
-                dg.peak_dirs = fodf_4d
+                dg.peak_dirs = fodf_data
             else:
                 logging.info('Input detected as fodf.')
                 npeaks = 5
@@ -505,11 +493,11 @@ class TractographyLogic(ScriptedLoadableModuleLogic):
                 peak_values = np.zeros(odf_shape_3d + (npeaks,))
                 peak_indices = np.full(odf_shape_3d + (npeaks,), -1, dtype='int')
                 b_matrix = self.get_b_matrix(self,
-                    self.find_order_from_nb_coeff(fodf_4d), sphere, sh_basis)
+                    self.find_order_from_nb_coeff(fodf_data), sphere, sh_basis)
 
-                for idx in np.argwhere(np.sum(fodf_4d, axis=-1)):
+                for idx in np.argwhere(np.sum(fodf_data, axis=-1)):
                     idx = tuple(idx)
-                    directions, values, indices = self.get_maximas(fodf_4d[idx],
+                    directions, values, indices = self.get_maximas(fodf_data[idx],
                                                             sphere, b_matrix,
                                                             sf_threshold, 0)
                     if values.shape[0] != 0:
@@ -554,18 +542,16 @@ class TractographyLogic(ScriptedLoadableModuleLogic):
 
         tractogram = StatefulTractogram(
             streamlines=filtered_streamlines,
+            reference=img,
             data_per_streamline={},
             data_per_point={},
-            affine_to_rasmm=affine,
             space=Space.RASMM)
 
-        nib.streamlines.save(tractogram, outputTrkFilePath)
+        # nib.streamlines.save(tractogram, outputTrkFilePath)
+
+        save_trk(tractogram, outputTrkFilePath, bbox_valid_check=False)
 
         stopTime = time.time()
         logging.info(f"Processing completed in {stopTime - startTime:.2f} seconds")
 
-
-#
-# TractographyTest
-#
 
