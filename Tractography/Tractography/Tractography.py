@@ -16,11 +16,14 @@ from slicer.parameterNodeWrapper import (
     WithinRange,
 )
 
+from trkTovtk import saveStreamlinesVTK
+
 
 import logging
-
+from dipy.tracking.streamline import Streamlines
 from dipy.io.image import load_nifti
 from dipy.core.sphere import HemiSphere
+from dipy.io.streamline import load_tractogram
 from dipy.data import get_sphere
 from dipy.direction import (DeterministicMaximumDirectionGetter,
                             ProbabilisticDirectionGetter)
@@ -28,9 +31,10 @@ from dipy.direction.peaks import PeaksAndMetrics
 from dipy.tracking.local_tracking import LocalTracking
 from dipy.tracking.stopping_criterion import BinaryStoppingCriterion
 from dipy.tracking.streamlinespeed import length
-from dipy.io.streamline import save_trk
+from dipy.io.streamline import save_trk, load_trk
 from dipy.tracking import utils as track_utils
 import nibabel as nib
+from vtk import vtkPolyDataReader
 import numpy as np
 import warnings
 
@@ -70,7 +74,7 @@ See more information in <a href="https://github.com/organization/projectname#Tra
 """)
         # TODO: replace with organization, grant and thanks
         self.parent.acknowledgementText = _("""
-This file was originally developed by Mahir Jain and is funded by NIH grant 3P41RR013218-12S1.
+This file was originally developed by Mahir Jain.
 """)
 
         # Additional initialization step after application startup is complete
@@ -291,7 +295,7 @@ class TractographyWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         
         with slicer.util.tryWithErrorDisplay(_("Failed to compute results."), waitCursor=True):
             # Compute output
-            self.logic.process(self.ui.inputSelector.currentNode(), self.ui.invertedInputSelector.currentNode(), mvNode, "trk_1061_mrm_detT.trk", niftiFilePath)
+            self.logic.process(self.ui.inputSelector.currentNode(), self.ui.invertedInputSelector.currentNode(), mvNode, "/Users/mahir/Desktop/MTP/trk_1061_mrm_detT.trk", niftiFilePath)
 
 #
 # TractographyLogic
@@ -550,6 +554,28 @@ class TractographyLogic(ScriptedLoadableModuleLogic):
         # nib.streamlines.save(tractogram, outputTrkFilePath)
 
         save_trk(tractogram, outputTrkFilePath, bbox_valid_check=False)
+
+        tractogram = load_tractogram(outputTrkFilePath, reference='same', bbox_valid_check=False, to_space=Space.RASMM)
+        saveStreamlinesVTK(tractogram.streamlines, "/Users/mahir/Desktop/MTP/result.vtk")
+
+        reader = vtkPolyDataReader()
+        reader.SetFileName("/Users/mahir/Desktop/MTP/result.vtk")
+        reader.Update()
+
+        polydata = reader.GetOutput()
+
+        streamline_node = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLModelNode")
+        streamline_node.SetAndObservePolyData(polydata)
+
+        display_node = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLModelDisplayNode")
+        streamline_node.SetAndObserveDisplayNodeID(display_node.GetID())
+
+        display_node.SetColor(0, 1, 0)  
+        display_node.SetOpacity(1.0)  
+
+        slicer.app.applicationLogic().GetSelectionNode().SetReferenceActiveVolumeID(streamline_node.GetID())
+        slicer.app.applicationLogic().PropagateVolumeSelection()
+        slicer.app.layoutManager().resetThreeDViews()
 
         stopTime = time.time()
         logging.info(f"Processing completed in {stopTime - startTime:.2f} seconds")
