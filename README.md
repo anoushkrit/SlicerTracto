@@ -129,9 +129,6 @@ This project is licensed under the MIT License. See the [LICENSE](LICENSE) file 
 
 ## Authors
 
-- **Your Name** – *Developer and Maintainer*  
-  Contact: your.email@example.com
-
 - **Contributors:**  
   - Gagan Gupta (IIT MANDI)  
   - Mahir Jain (IIT MANDI)
