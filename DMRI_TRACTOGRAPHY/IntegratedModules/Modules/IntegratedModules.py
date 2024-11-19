@@ -11,7 +11,6 @@ if module_path not in sys.path:
 
 for i in sys.path
     print(i)
-
 import vtk
 
 import slicer
@@ -29,8 +28,6 @@ from slicer import vtkMRMLScalarVolumeNode
 from generateFodfModule import GenerateFODF
 from tractographyModule import Tractography
 from metricAnalysisModule import MetricAnalysis
-from segmentationModule import Segmentation
-
 
 
 
@@ -48,7 +45,7 @@ class IntegratedModules(ScriptedLoadableModule):
         ScriptedLoadableModule.__init__(self, parent)
         self.parent.title = _("IntegratedModules")  # TODO: make this more human readable by adding spaces
         # TODO: set categories (folders where the module shows up in the module selector)
-        self.parent.categories = [translate("qSlicerAbstractCoreModule", "DMRI_TRACTOGRAPHY")]
+        self.parent.categories = [translate("qSlicerAbstractCoreModule", "Examples")]
         self.parent.dependencies = []  # TODO: add here list of module names that this module requires
         self.parent.contributors = ["John Doe (AnyWare Corp.)"]  # TODO: replace with "Firstname Lastname (Organization)"
         # TODO: update with short description of the module and a link to online module documentation
@@ -136,7 +133,6 @@ class IntegratedModulesWidget(ScriptedLoadableModuleWidget, VTKObservationMixin)
         self._generateFodfParams : GenerateFODF = GenerateFODF()
         self._tractographyParams : Tractography = Tractography()
         self._metricAnalysis : MetricAnalysis = MetricAnalysis()
-        self._segmentationParams : Segmentation = Segmentation()
 
 
 
@@ -161,64 +157,75 @@ class IntegratedModulesWidget(ScriptedLoadableModuleWidget, VTKObservationMixin)
         self.addObserver(slicer.mrmlScene, slicer.mrmlScene.StartCloseEvent, self.onSceneStartClose)
         self.addObserver(slicer.mrmlScene, slicer.mrmlScene.EndCloseEvent, self.onSceneEndClose)
 
-        # # Generate FODF Module Connections
-        # # Buttons
-        # self.ui.generateFodfButton.connect("clicked(bool)", self._generateFodfParams.generateFodf)
-        # self.ui.visualizeFodfButton.connect("clicked(bool)", self._generateFodfParams.visualizeFodf)
-        # # Paths
-        # self.ui.whiteMaskBiftiPath.connect('currentPathChanged(QString)', self._generateFodfParams.setWhiteMaskBiftiPath)
-        # self.ui.diffusionNiftiPath.connect('currentPathChanged(QString)', self._generateFodfParams.setDiffusionNiftiPath)
-        # self.ui.bvalsPath.connect('currentPathChanged(QString)', self._generateFodfParams.setBvalsPath)
-        # self.ui.bvecsPath.connect('currentPathChanged(QString)', self._generateFodfParams.setBvecsPath)
-        # self.ui.fodfPath.connect('currentPathChanged(QString)', self._generateFodfParams.setFodfPath)
-        # # Output Text Box
-        # self._generateFodfParams.outputText = self.ui.outputTextGeneratedFodf
-
-        # # Tractography Module Connections
-        # # Buttons
-        # self.ui.generateTrkButton.connect("clicked(bool)", self._tractographyParams.generateTrk)
-        # self.ui.visualizeTrkButton.connect("clicked(bool)", self._tractographyParams.visualizeTrk)
-        # # Paths
-        # self.ui.approxMaskPath.connect('currentPathChanged(QString)', self._tractographyParams.set_approxMaskPath)
-        # self.ui.fodfTractographyPath.connect('currentPathChanged(QString)', self._tractographyParams.set_fodfPath)
-        # self.ui.approxMaskPath.connect('currentPathChanged(QString)', self._tractographyParams.set_approxMaskPath)
-        # self.ui.trkPath.connect('currentPathChanged(QString)', self._tractographyParams.set_trkPath)
-        # # Text
-        # validator = qt.QDoubleValidator()
-        # validator.setNotation(qt.QDoubleValidator.StandardNotation)
-        # validator.setDecimals(4)  # Allow up to 4 decimal places
-        # validator.setRange(-100.0, 100.0) 
-        # self.ui.stepSize.setValidator(validator)
-        # self.ui.stepSize.textChanged.connect(self._tractographyParams.set_stepSize)
-        # #Combo Box
-        # self.ui.algo.currentIndexChanged.connect(self._tractographyParams.set_algo)
-        # #Output Box
-        # self._tractographyParams.outputText = self.ui.outputTextTractography
-
-        # # Metrix Analysis Module Connections
-        # # Buttons
-        # self.ui.generateResultsButton.connect("clicked(bool)", self._metricAnalysis.generateMetrics)
-        # # Paths
-        # self.ui.predictedTrkPath.connect('currentPathChanged(QString)', self._metricAnalysis.setPredictedTrkPath)
-        # self.ui.groundTruthTrkPath.connect('currentPathChanged(QString)', self._metricAnalysis.setGroundTruthTrkPath)
-        # # Initializing Outputs Text
-        # self.ui.diceScore.setText(f'Dice Score: -')
-        # self.ui.overlapScore.setText(f'Overlap: -')
-        # self.ui.overreachScore.setText(f'Overreach: -')
-        # # passing UI parameter
-        # self._metricAnalysis.ui.outputText = self.ui
-
-        # Segmenation Module Connections
         # Buttons
-        self.ui.segmentationButton_Segmentation.connect("clicked(bool)", self._segmentationParams.segmentTrk)
-        self.ui.visualizeTrks_Segmentation.connect("clicked(bool)", self._segmentationParams.visualizeSegmentation)
-        # Path
-        self.ui.trkPath_Segmentation.connect('currentPathChanged(QString)', self._segmentationParams.set_trkPath)
-        self.ui.segmentedTrkFolderPath_Segmentation.connect('currentPathChanged(QString)', self._segmentationParams.set_segmentedTrkFolderPath)
-        # Output Text Box
-        self._segmentationParams.outputText = self.ui.outputText_Segmenatation
-        # Slider 
-        self.ui.threasholdInput.valueChanged.connect(self._segmentationParams.set_threshold)
+         # Connections
+
+        # These connections ensure that we update parameter node when scene is closed
+        self.addObserver(slicer.mrmlScene, slicer.mrmlScene.StartCloseEvent, self.onSceneStartClose)
+        self.addObserver(slicer.mrmlScene, slicer.mrmlScene.EndCloseEvent, self.onSceneEndClose)
+
+        # Buttons
+        self.ui.generateFodfButton.connect("clicked(bool)", self._generateFodfParams.generateFodf)
+        self.ui.visualizeFodfButton.connect("clicked(bool)", self._generateFodfParams.visualizeFodf)
+
+        # Paths
+        self.ui.whiteMaskBiftiPath.connect('currentPathChanged(QString)', self._generateFodfParams.setWhiteMaskBiftiPath)
+        self.ui.diffusionNiftiPath.connect('currentPathChanged(QString)', self._generateFodfParams.setDiffusionNiftiPath)
+        self.ui.bvalsPath.connect('currentPathChanged(QString)', self._generateFodfParams.setBvalsPath)
+        self.ui.bvecsPath.connect('currentPathChanged(QString)', self._generateFodfParams.setBvecsPath)
+        self.ui.fodfPath.connect('currentPathChanged(QString)', self._generateFodfParams.setFodfPath)
+
+        # Buttons
+        self.ui.generateTrkButton.connect("clicked(bool)", self._tractographyParams.generateTrk)
+        self.ui.visualizeTrkButton.connect("clicked(bool)", self._tractographyParams.visualizeTrk)
+
+        # Paths
+        self.ui.approxMaskPath.connect('currentPathChanged(QString)', self._tractographyParams.set_approxMaskPath)
+        self.ui.fodfTractographyPath.connect('currentPathChanged(QString)', self._tractographyParams.set_fodfPath)
+        self.ui.approxMaskPath.connect('currentPathChanged(QString)', self._tractographyParams.set_approxMaskPath)
+        self.ui.trkPath.connect('currentPathChanged(QString)', self._tractographyParams.set_trkPath)
+
+        # Text
+        validator = qt.QDoubleValidator()
+        validator.setNotation(qt.QDoubleValidator.StandardNotation)
+        validator.setDecimals(4)  # Allow up to 4 decimal places
+        validator.setRange(-100.0, 100.0) 
+        self.ui.stepSize.setValidator(validator)
+        self.ui.stepSize.textChanged.connect(self._tractographyParams.set_stepSize)
+
+        #Combo Box
+        self.ui.algo.currentIndexChanged.connect(self._tractographyParams.set_algo)
+        
+        #Output Box
+        self._tractographyParams.outputText = self.ui.outputTextTractography
+        self._generateFodfParams.outputText = self.ui.outputTextGeneratedFodf
+
+
+        # Connections
+
+        # These connections ensure that we update parameter node when scene is closed
+        self.addObserver(slicer.mrmlScene, slicer.mrmlScene.StartCloseEvent, self.onSceneStartClose)
+        self.addObserver(slicer.mrmlScene, slicer.mrmlScene.EndCloseEvent, self.onSceneEndClose)
+
+        # Buttons
+        self.ui.generateResultsButton.connect("clicked(bool)", self._metricAnalysis.generateMetrics)
+
+        # Paths
+        self.ui.predictedTrkPath.connect('currentPathChanged(QString)', self._metricAnalysis.setPredictedTrkPath)
+        self.ui.groundTruthTrkPath.connect('currentPathChanged(QString)', self._metricAnalysis.setGroundTruthTrkPath)
+
+        # Initializing Outputs Text
+        self.ui.diceScore.setText(f'Dice Score: -')
+        self.ui.overlapScore.setText(f'Overlap: -')
+        self.ui.overreachScore.setText(f'Overreach: -')
+
+        # passing UI parameter
+        self._metricAnalysis.ui = self.ui
+
+
+
+
+
 
     def cleanup(self) -> None:
         """Called when the application closes and the module widget is destroyed."""

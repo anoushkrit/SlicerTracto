@@ -20,6 +20,7 @@ include(${Slicer_USE_FILE})
 #-----------------------------------------------------------------------------
 # Extension modules
 add_subdirectory(IntegratedModules)
+add_subdirectory(DMRI_Tractography)
 ## NEXT_MODULE
 
 #-----------------------------------------------------------------------------

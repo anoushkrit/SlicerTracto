@@ -1,90 +1,93 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ui version="4.0">
  <class>IntegratedModules</class>
- <widget class="qMRMLWidget" name="IntegratedModules">
+ <widget class="qMRMLWidget" name="FourthModule">
   <property name="geometry">
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>325</width>
-    <height>844</height>
+    <width>368</width>
+    <height>331</height>
    </rect>
   </property>
   <layout class="QVBoxLayout" name="verticalLayout">
    <item>
     <widget class="ctkCollapsibleButton" name="inputsCollapsibleButton">
      <property name="text">
-      <string>Generate FODFs</string>
+      <string>Segmentation</string>
      </property>
      <layout class="QFormLayout" name="formLayout_2">
       <item row="0" column="0">
-       <widget class="QLabel" name="label_6">
+       <widget class="QLabel" name="label">
         <property name="text">
-         <string>Input Paths</string>
+         <string>Inputs</string>
         </property>
        </widget>
       </item>
       <item row="1" column="0">
-       <widget class="QLabel" name="label">
-        <property name="text">
-         <string>White Mask Bifti</string>
-        </property>
-       </widget>
-      </item>
-      <item row="1" column="1">
-       <widget class="ctkPathLineEdit" name="whiteMaskBiftiPath"/>
-      </item>
-      <item row="2" column="0">
        <widget class="QLabel" name="label_2">
         <property name="text">
-         <string>Diffusion Nifti</string>
+         <string>Trk File Path</string>
         </property>
        </widget>
-      </item>
-      <item row="2" column="1">
-       <widget class="ctkPathLineEdit" name="diffusionNiftiPath"/>
       </item>
       <item row="3" column="0">
        <widget class="QLabel" name="label_4">
         <property name="text">
-         <string>BVALS.bvals</string>
+         <string>Folder to save Output Trks</string>
         </property>
        </widget>
       </item>
+      <item row="1" column="1">
+       <widget class="ctkPathLineEdit" name="trkPath_Segmentation"/>
+      </item>
       <item row="3" column="1">
-       <widget class="ctkPathLineEdit" name="bvalsPath"/>
+       <widget class="ctkPathLineEdit" name="segmentedTrkFolderPath_Segmentation">
+        <property name="filters">
+         <set>ctkPathLineEdit::Dirs</set>
+        </property>
+       </widget>
+      </item>
+      <item row="2" column="0">
+       <widget class="QLabel" name="label_3">
+        <property name="text">
+         <string>Threashold</string>
+        </property>
+       </widget>
+      </item>
+      <item row="2" column="1">
+       <widget class="ctkSliderWidget" name="threasholdInput">
+        <property name="toolTip">
+         <string>Set threshold value for computing the output image. Voxels that have intensities lower than this value will set to zero.</string>
+        </property>
+        <property name="singleStep">
+         <double>1.000000000000000</double>
+        </property>
+        <property name="minimum">
+         <double>1.000000000000000</double>
+        </property>
+        <property name="maximum">
+         <double>200.000000000000000</double>
+        </property>
+        <property name="value">
+         <double>10.000000000000000</double>
+        </property>
+        <property name="SlicerParameterName" stdset="0">
+         <string>imageThreshold</string>
+        </property>
+       </widget>
       </item>
       <item row="4" column="0">
-       <widget class="QLabel" name="label_5">
+       <widget class="QPushButton" name="segmentationButton_Segmentation">
         <property name="text">
-         <string>BVECS.bvecs</string>
+         <string>Segment</string>
         </property>
        </widget>
       </item>
       <item row="4" column="1">
-       <widget class="ctkPathLineEdit" name="bvecsPath"/>
-      </item>
-      <item row="6" column="0">
-       <widget class="QLabel" name="label_3">
+       <widget class="QPushButton" name="visualizeTrks_Segmentation">
         <property name="text">
-         <string>Path to Save FODF</string>
-        </property>
-       </widget>
-      </item>
-      <item row="6" column="1">
-       <widget class="ctkPathLineEdit" name="fodfPath"/>
-      </item>
-      <item row="7" column="0">
-       <widget class="QPushButton" name="generateFodfButton">
-        <property name="text">
-         <string>Generate Fodf</string>
-        </property>
-       </widget>
-      </item>
-      <item row="7" column="1">
-       <widget class="QPushButton" name="visualizeFodfButton">
-        <property name="text">
-         <string>Visualize FODF</string>
+         <string>Visualize Trks</string>
         </property>
        </widget>
       </item>
@@ -92,173 +95,7 @@
     </widget>
    </item>
    <item>
-    <widget class="ctkFittedTextBrowser" name="outputTextGeneratedFodf"/>
-   </item>
-   <item>
-    <layout class="QVBoxLayout" name="verticalLayout">
-     <item>
-      <widget class="ctkCollapsibleButton" name="inputsCollapsibleButton">
-       <property name="text">
-        <string>Tractography</string>
-       </property>
-       <layout class="QFormLayout" name="formLayout_2">
-        <item row="0" column="0">
-         <widget class="QLabel" name="label">
-          <property name="text">
-           <string>Inputs</string>
-          </property>
-         </widget>
-        </item>
-        <item row="1" column="0">
-         <widget class="QLabel" name="label_3">
-          <property name="text">
-           <string>Approximate Mask</string>
-          </property>
-         </widget>
-        </item>
-        <item row="1" column="1">
-         <widget class="ctkPathLineEdit" name="approxMaskPath"/>
-        </item>
-        <item row="2" column="0">
-         <widget class="QLabel" name="label_2">
-          <property name="text">
-           <string>FODF</string>
-          </property>
-         </widget>
-        </item>
-        <item row="2" column="1">
-         <widget class="ctkPathLineEdit" name="fodfTractographyPath"/>
-        </item>
-        <item row="3" column="0">
-         <widget class="QLabel" name="label_4">
-          <property name="text">
-           <string>Step Size</string>
-          </property>
-         </widget>
-        </item>
-        <item row="3" column="1">
-         <widget class="QLineEdit" name="stepSize"/>
-        </item>
-        <item row="5" column="0">
-         <widget class="QLabel" name="label_5">
-          <property name="text">
-           <string>Algorithm</string>
-          </property>
-         </widget>
-        </item>
-        <item row="5" column="1">
-         <widget class="QComboBox" name="algo">
-          <item>
-           <property name="text">
-            <string>det</string>
-           </property>
-          </item>
-          <item>
-           <property name="text">
-            <string>prob</string>
-           </property>
-          </item>
-         </widget>
-        </item>
-        <item row="7" column="0">
-         <widget class="QLabel" name="label_6">
-          <property name="text">
-           <string>Location to save Trk</string>
-          </property>
-         </widget>
-        </item>
-        <item row="7" column="1">
-         <widget class="ctkPathLineEdit" name="trkPath">
-          <property name="filters">
-           <set>ctkPathLineEdit::Dirs</set>
-          </property>
-         </widget>
-        </item>
-        <item row="8" column="0">
-         <widget class="QPushButton" name="generateTrkButton">
-          <property name="text">
-           <string>Generate Trk</string>
-          </property>
-         </widget>
-        </item>
-        <item row="8" column="1">
-         <widget class="QPushButton" name="visualizeTrkButton">
-          <property name="text">
-           <string>Visualize Trk</string>
-          </property>
-         </widget>
-        </item>
-       </layout>
-      </widget>
-     </item>
-     <item>
-      <widget class="ctkFittedTextBrowser" name="outputTextTractography"/>
-     </item>
-    </layout>
-   </item>
-   <item>
-    <layout class="QVBoxLayout" name="verticalLayout">
-     <item>
-      <widget class="ctkCollapsibleButton" name="inputsCollapsibleButton">
-       <property name="text">
-        <string>Metrics Analysis</string>
-       </property>
-       <layout class="QFormLayout" name="formLayout_2">
-        <item row="0" column="0">
-         <widget class="QLabel" name="label">
-          <property name="text">
-           <string>Predicted Trk Path: </string>
-          </property>
-         </widget>
-        </item>
-        <item row="0" column="1">
-         <widget class="ctkPathLineEdit" name="predictedTrkPath"/>
-        </item>
-        <item row="1" column="0">
-         <widget class="QLabel" name="label_3">
-          <property name="text">
-           <string>Ground Truth Trk Path: </string>
-          </property>
-         </widget>
-        </item>
-        <item row="1" column="1">
-         <widget class="ctkPathLineEdit" name="groundTruthTrkPath"/>
-        </item>
-        <item row="3" column="0">
-         <widget class="QPushButton" name="generateResultsButton">
-          <property name="toolTip">
-           <string>Run the algorithm.</string>
-          </property>
-          <property name="text">
-           <string>Generate Results</string>
-          </property>
-         </widget>
-        </item>
-        <item row="4" column="0">
-         <widget class="QLabel" name="diceScore">
-          <property name="text">
-           <string>Dice Score: </string>
-          </property>
-         </widget>
-        </item>
-        <item row="5" column="0">
-         <widget class="QLabel" name="overreachScore">
-          <property name="text">
-           <string>Overreach:</string>
-          </property>
-         </widget>
-        </item>
-        <item row="6" column="0">
-         <widget class="QLabel" name="overlapScore">
-          <property name="text">
-           <string>Overlap: </string>
-          </property>
-         </widget>
-        </item>
-       </layout>
-      </widget>
-     </item>
-    </layout>
+    <widget class="ctkFittedTextBrowser" name="outputText_Segmenatation"/>
    </item>
    <item>
     <spacer name="verticalSpacer">
@@ -291,6 +128,11 @@
    <class>ctkPathLineEdit</class>
    <extends>QWidget</extends>
    <header>ctkPathLineEdit.h</header>
+  </customwidget>
+  <customwidget>
+   <class>ctkSliderWidget</class>
+   <extends>QWidget</extends>
+   <header>ctkSliderWidget.h</header>
   </customwidget>
   <customwidget>
    <class>qMRMLWidget</class>
