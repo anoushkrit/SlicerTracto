@@ -57,7 +57,7 @@ Calculates metrics to compare two tractography files, enabling evaluation of ove
 2. Switch to extension-with-integrated-modules and then Clone the **scilpy** library inside the main module directory:
    ```bash
    cd DMRI_TRACTOGRAPHY
-   git clone https://github.com/scilus/scilpy.git IntegratedModule/scilpy
+   git clone https://github.com/scilus/scilpy.git DMRI_Tractography/scilpy
    ```
 
    The `scilpy` library provides essential tools for diffusion MRI processing and tractography.
