@@ -1,14 +1,10 @@
 import os
 import sys
-
+#########################################################################################
 sibling_folder_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'scilpy'))
-
-# Add it to sys.path
 if sibling_folder_path not in sys.path:
     sys.path.append(sibling_folder_path)
-for i in sys.path
-    print(i)
-
+#########################################################################################
 from scripts.scil_frf_ssst import main as scil_frf_ssst_main
 from scripts.scil_fodf_ssst import main as scil_fodf_ssst_main
 from scripts.scil_dti_metrics import main as scil_dti_metrics_main

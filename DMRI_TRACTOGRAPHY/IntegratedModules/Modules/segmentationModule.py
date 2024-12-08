@@ -8,7 +8,6 @@ from dipy.io.streamline import save_tractogram
 import vtk
 import os
 import slicer
-import random
 
 DEFAULT_SEGMENTED_TRK_FILE_NAME_PREFIX = 'segmentedTrk'
 file_path = os.path.abspath(__file__)

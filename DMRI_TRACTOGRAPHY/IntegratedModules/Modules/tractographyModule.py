@@ -2,16 +2,17 @@ import os
 import sys
 import logging
 
-# Get the path to the scilpy folder and add to sys paths
+#########################################################################################
 sibling_folder_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'scilpy'))
 if sibling_folder_path not in sys.path:
     sys.path.append(sibling_folder_path)
+#########################################################################################
+
 
 from scilpy.reconst.utils import (find_order_from_nb_coeff,
                                     get_maximas)
 from scilpy.io.image import get_data_as_mask
 from scilpy.tracking.utils import get_theta
-
 from dipy.tracking.local_tracking import LocalTracking
 from dipy.tracking.stopping_criterion import BinaryStoppingCriterion
 from dipy.tracking.streamlinespeed import length
