@@ -68,7 +68,7 @@ class GenerateFODF:
             print(f"Invalid Fodf path: {path}")
     
     def generateFodf(self):
-        preproc_data_dir = "/Users/mahir/Desktop/SlicerTracto/MTP/outputs"
+        preproc_data_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Results")
         
         try:
             # Ensure output directory exists

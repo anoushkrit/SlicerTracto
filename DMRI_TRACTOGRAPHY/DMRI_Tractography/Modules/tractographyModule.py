@@ -56,10 +56,12 @@ SEED = None
 SAVE_SEEDS = False
 FILETYPE = nib.streamlines.TrkFile
 COMPRESS : float = 0.0
-SEEDING_MASK_FILE_PATH: str = "C:/Users/HP/Documents/MTP/Slicer-Task/Final Modules/Results/sub_1061_seeding_mask.nii"
 DEFAULT_TRK_FILE_NAME = "result.trk"
 DEFAULt_VTK_FILE_NAME = "result.vtk"
-DEFAULT_DIR = "C:/Users/HP/Documents/MTP/Slicer-Task/Final Modules/Results/"
+DEFAULT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Results")
+os.makedirs(DEFAULT_DIR, exist_ok=True)
+SEEDING_MASK_FILE_PATH: str = os.path.join(DEFAULT_DIR, 'sub_1061_seeding_mask.nii')
+
 
 class Tractography:
     def __init__(self):
