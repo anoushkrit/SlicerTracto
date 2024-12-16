@@ -27,6 +27,8 @@ from generateFodfModule import GenerateFODF
 from tractographyModule import Tractography
 from metricAnalysisModule import MetricAnalysis
 from segmentationModule import Segmentation
+from Middleware.middleware import Middleware
+from SSH_Connection.ssh_connection import SSHConnection
 
 #
 # DMRI_Tractography
@@ -112,30 +114,6 @@ def registerSampleData():
 
 
 #
-# DMRI_TractographyParameterNode
-#
-
-
-@parameterNodeWrapper
-class DMRI_TractographyParameterNode:
-    """
-    The parameters needed by module.
-
-    inputVolume - The volume to threshold.
-    imageThreshold - The value at which to threshold the input volume.
-    invertThreshold - If true, will invert the threshold.
-    thresholdedVolume - The output volume that will contain the thresholded volume.
-    invertedVolume - The output volume that will contain the inverted thresholded volume.
-    """
-
-    inputVolume: vtkMRMLScalarVolumeNode
-    imageThreshold: Annotated[float, WithinRange(-100, 500)] = 100
-    invertThreshold: bool = False
-    thresholdedVolume: vtkMRMLScalarVolumeNode
-    invertedVolume: vtkMRMLScalarVolumeNode
-
-
-#
 # DMRI_TractographyWidget
 #
 
@@ -149,14 +127,14 @@ class DMRI_TractographyWidget(ScriptedLoadableModuleWidget, VTKObservationMixin)
         """Called when the user opens the module the first time and the widget is initialized."""
         ScriptedLoadableModuleWidget.__init__(self, parent)
         VTKObservationMixin.__init__(self)  # needed for parameter node observation
-        self.logic = None
-        self._parameterNode = None
-        self._parameterNodeGuiTag = None
+       
         
         self._generateFodfParams : GenerateFODF = GenerateFODF()
         self._tractographyParams : Tractography = Tractography()
         self._metricAnalysis : MetricAnalysis = MetricAnalysis()
         self._segmentationParams : Segmentation = Segmentation()
+        self._middleware : Middleware =  Middleware()
+        self._sshConnection: SSHConnection = SSHConnection()
 
     def setup(self) -> None:
         """Called when the user opens the module the first time and the widget is initialized."""
@@ -173,53 +151,76 @@ class DMRI_TractographyWidget(ScriptedLoadableModuleWidget, VTKObservationMixin)
         # "setMRMLScene(vtkMRMLScene*)" slot.
         uiWidget.setMRMLScene(slicer.mrmlScene)
 
-        # Create logic class. Logic implements all computations that should be possible to run
-        # in batch mode, without a graphical user interface.
-        self.logic = DMRI_TractographyLogic()
-
         # Connections
 
         # These connections ensure that we update parameter node when scene is closed
         self.addObserver(slicer.mrmlScene, slicer.mrmlScene.StartCloseEvent, self.onSceneStartClose)
         self.addObserver(slicer.mrmlScene, slicer.mrmlScene.EndCloseEvent, self.onSceneEndClose)
 
-        # Buttons
-        # self.ui.applyButton.connect("clicked(bool)", self.onApplyButton)
+        self.ui.sshConnectionCheckBox.connect(self._middleware.setToggle)
+        self.ui.sshConnectionButton.connect(self._sshConnection.connect)
+
+        self.setup_generate_fodf_connections()
+        self.setup_tractography_connections()
+        self.setup_metric_analysis_connections()
+        self.setup_segementation_connections()
+    
+    def setup_generate_fodf_connections(self):
+
+        self._middleware.registerButton(self.ui.generateFodfButton, self._generateFodfParams.generateFodf, self._generateFodfParams.generateFodf)
+        self._middleware.registerButton(self.ui.visualizeFodfButton, self._generateFodfParams.visualizeFodf, self._generateFodfParams.visualizeFodf)
+        self._middleware.registerButton(self.ui.whiteMaskBiftiPath, self._generateFodfParams.setWhiteMaskBiftiPath, self._generateFodfParams.setWhiteMaskBiftiPath)
+        self._middleware.registerButton(self.ui.diffusionNiftiPath, self._generateFodfParams.setDiffusionNiftiPath, self._generateFodfParams.setDiffusionNiftiPath)
+        self._middleware.registerButton(self.ui.bvalsPath, self._generateFodfParams.setBvalsPath, self._generateFodfParams.setBvalsPath)
+        self._middleware.registerButton(self.ui.bvecsPath, self._generateFodfParams.setBvecsPath, self._generateFodfParams.setBvecsPath)
+        self._middleware.registerButton(self.ui.fodfPath,self._generateFodfParams.setFodfPath, self._generateFodfParams.setFodfPath)
 
         # Generate FODF Module Connections
         # Buttons
-        self.ui.generateFodfButton.connect("clicked(bool)", self._generateFodfParams.generateFodf)
-        self.ui.visualizeFodfButton.connect("clicked(bool)", self._generateFodfParams.visualizeFodf)
+        self.ui.generateFodfButton.connect("clicked(bool)", lambda: self._middleware.handleButtonPress(self.ui.generateFodfButton))
+        self.ui.visualizeFodfButton.connect("clicked(bool)", lambda: self._middleware.handleButtonPress(self.ui.visualizeFodfButton))
         # Paths
-        self.ui.whiteMaskBiftiPath.connect('currentPathChanged(QString)', self._generateFodfParams.setWhiteMaskBiftiPath)
-        self.ui.diffusionNiftiPath.connect('currentPathChanged(QString)', self._generateFodfParams.setDiffusionNiftiPath)
-        self.ui.bvalsPath.connect('currentPathChanged(QString)', self._generateFodfParams.setBvalsPath)
-        self.ui.bvecsPath.connect('currentPathChanged(QString)', self._generateFodfParams.setBvecsPath)
-        self.ui.fodfPath.connect('currentPathChanged(QString)', self._generateFodfParams.setFodfPath)
+        self.ui.whiteMaskBiftiPath.connect('currentPathChanged(QString)', lambda: self._middleware.handleButtonPress(self.ui.whiteMaskBiftiPath))
+        self.ui.diffusionNiftiPath.connect('currentPathChanged(QString)', lambda: self._middleware.handleButtonPress(self.ui.diffusionNiftiPath))
+        self.ui.bvalsPath.connect('currentPathChanged(QString)', lambda: self._middleware.handleButtonPress(self.ui.bvalsPath))
+        self.ui.bvecsPath.connect('currentPathChanged(QString)', lambda: self._middleware.handleButtonPress(self.ui.bvecsPath))
+        self.ui.fodfPath.connect('currentPathChanged(QString)', lambda: self._middleware.handleButtonPress(self.ui.fodfPath))
         # Output Text Box
         self._generateFodfParams.outputText = self.ui.outputTextGeneratedFodf
 
+    def setup_tractography_connections(self):
+
+        self._middleware.registerButton(self.ui.generateTrkButton, self._tractographyParams.generateTrk, self._tractographyParams.generateTrk)
+        self._middleware.registerButton(self.ui.visualizeTrkButton, self._tractographyParams.visualizeTrk, self._tractographyParams.visualizeTrk)
+        self._middleware.registerButton(self.ui.approxMaskPath, self._tractographyParams.set_approxMaskPath, self._tractographyParams.set_approxMaskPath)
+        self._middleware.registerButton(self.ui.fodfTractographyPath, self._tractographyParams.set_fodfPath, self._tractographyParams.set_fodfPath)
+        self._middleware.registerButton(self.ui.approxMaskPath, self._tractographyParams.set_approxMaskPath, self._tractographyParams.set_approxMaskPath)
+        self._middleware.registerButton(self.ui.trkPath, self._tractographyParams.set_trkPath, self._tractographyParams.set_trkPath)
+        self._middleware.registerButton(self.ui.stepSize.textChanged, self._tractographyParams.set_stepSize, self._tractographyParams.set_stepSize)
+        self._middleware.registerButton(self.ui.algo.currentIndexChanged, self._tractographyParams.set_algo, self._tractographyParams.set_algo)
+
         # Tractography Module Connections
         # Buttons
-        self.ui.generateTrkButton.connect("clicked(bool)", self._tractographyParams.generateTrk)
-        self.ui.visualizeTrkButton.connect("clicked(bool)", self._tractographyParams.visualizeTrk)
+        self.ui.generateTrkButton.connect("clicked(bool)", lambda: self._middleware.handleButtonPress(self.ui.generateTrkButton))
+        self.ui.visualizeTrkButton.connect("clicked(bool)", lambda: self._middleware.handleButtonPress(self.ui.visualizeTrkButton))
         # Paths
-        self.ui.approxMaskPath.connect('currentPathChanged(QString)', self._tractographyParams.set_approxMaskPath)
-        self.ui.fodfTractographyPath.connect('currentPathChanged(QString)', self._tractographyParams.set_fodfPath)
-        self.ui.approxMaskPath.connect('currentPathChanged(QString)', self._tractographyParams.set_approxMaskPath)
-        self.ui.trkPath.connect('currentPathChanged(QString)', self._tractographyParams.set_trkPath)
+        self.ui.approxMaskPath.connect('currentPathChanged(QString)', lambda: self._middleware.handleButtonPress(self.ui.approxMaskPath))
+        self.ui.fodfTractographyPath.connect('currentPathChanged(QString)', lambda: self._middleware.handleButtonPress(self.ui.fodfTractographyPath))
+        self.ui.approxMaskPath.connect('currentPathChanged(QString)', lambda: self._middleware.handleButtonPress(self.ui.approxMaskPath))
+        self.ui.trkPath.connect('currentPathChanged(QString)', lambda: self._middleware.handleButtonPress(self.ui.trkPath))
         # Text
         validator = qt.QDoubleValidator()
         validator.setNotation(qt.QDoubleValidator.StandardNotation)
         validator.setDecimals(4)  # Allow up to 4 decimal places
         validator.setRange(-100.0, 100.0) 
         self.ui.stepSize.setValidator(validator)
-        self.ui.stepSize.textChanged.connect(self._tractographyParams.set_stepSize)
+        self.ui.stepSize.textChanged.connect(lambda: self._middleware.handleButtonPress(self.ui.tepSize.textChanged))
         #Combo Box
-        self.ui.algo.currentIndexChanged.connect(self._tractographyParams.set_algo)
+        self.ui.algo.currentIndexChanged.connect(lambda: self._middleware.handleButtonPress(self.ui.algo.currentIndexChanged))
         #Output Box
         self._tractographyParams.outputText = self.ui.outputTextTractography
 
+    def setup_metric_analysis_connections(self):
         # Metrix Analysis Module Connections
         # Buttons
         self.ui.generateResultsButton.connect("clicked(bool)", self._metricAnalysis.generateMetrics)
@@ -233,6 +234,7 @@ class DMRI_TractographyWidget(ScriptedLoadableModuleWidget, VTKObservationMixin)
         # passing UI parameter
         self._metricAnalysis.ui = self.ui
 
+    def setup_segementation_connections(self):
         # Segmenation Module Connections
         # Buttons
         self.ui.segmentationButton_Segmentation.connect("clicked(bool)", self._segmentationParams.segmentTrk)
@@ -245,216 +247,19 @@ class DMRI_TractographyWidget(ScriptedLoadableModuleWidget, VTKObservationMixin)
         # Slider 
         self.ui.threasholdInput.valueChanged.connect(self._segmentationParams.set_threshold)
 
-
-        # Make sure parameter node is initialized (needed for module reload)
-        self.initializeParameterNode()
-
     def cleanup(self) -> None:
         """Called when the application closes and the module widget is destroyed."""
         self.removeObservers()
 
     def enter(self) -> None:
-        """Called each time the user opens this module."""
-        # Make sure parameter node exists and observed
-        self.initializeParameterNode()
+        pass
 
     def exit(self) -> None:
-        """Called each time the user opens a different module."""
-        # Do not react to parameter node changes (GUI will be updated when the user enters into the module)
-        if self._parameterNode:
-            self._parameterNode.disconnectGui(self._parameterNodeGuiTag)
-            self._parameterNodeGuiTag = None
-            self.removeObserver(self._parameterNode, vtk.vtkCommand.ModifiedEvent, self._checkCanApply)
+        pass
 
     def onSceneStartClose(self, caller, event) -> None:
-        """Called just before the scene is closed."""
-        # Parameter node will be reset, do not use it anymore
-        self.setParameterNode(None)
+        pass
 
     def onSceneEndClose(self, caller, event) -> None:
-        """Called just after the scene is closed."""
-        # If this module is shown while the scene is closed then recreate a new parameter node immediately
-        if self.parent.isEntered:
-            self.initializeParameterNode()
+        pass
 
-    def initializeParameterNode(self) -> None:
-        """Ensure parameter node exists and observed."""
-        # Parameter node stores all user choices in parameter values, node selections, etc.
-        # so that when the scene is saved and reloaded, these settings are restored.
-
-        self.setParameterNode(self.logic.getParameterNode())
-
-        # Select default input nodes if nothing is selected yet to save a few clicks for the user
-        # if not self._parameterNode.inputVolume:
-        #     firstVolumeNode = slicer.mrmlScene.GetFirstNodeByClass("vtkMRMLScalarVolumeNode")
-        #     if firstVolumeNode:
-        #         self._parameterNode.inputVolume = firstVolumeNode
-
-    def setParameterNode(self, inputParameterNode: Optional[DMRI_TractographyParameterNode]) -> None:
-        """
-        Set and observe parameter node.
-        Observation is needed because when the parameter node is changed then the GUI must be updated immediately.
-        """
-
-        if self._parameterNode:
-            self._parameterNode.disconnectGui(self._parameterNodeGuiTag)
-            # self.removeObserver(self._parameterNode, vtk.vtkCommand.ModifiedEvent, self._checkCanApply)
-        self._parameterNode = inputParameterNode
-        if self._parameterNode:
-            # Note: in the .ui file, a Qt dynamic property called "SlicerParameterName" is set on each
-            # ui element that needs connection.
-            self._parameterNodeGuiTag = self._parameterNode.connectGui(self.ui)
-            # self.addObserver(self._parameterNode, vtk.vtkCommand.ModifiedEvent, self._checkCanApply)
-            # self._checkCanApply()
-
-    # def _checkCanApply(self, caller=None, event=None) -> None:
-    #     pass
-    #     # if self._parameterNode and self._parameterNode.inputVolume and self._parameterNode.thresholdedVolume:
-    #     #     self.ui.applyButton.toolTip = _("Compute output volume")
-    #     #     self.ui.applyButton.enabled = True
-    #     # else:
-    #     #     self.ui.applyButton.toolTip = _("Select input and output volume nodes")
-    #     #     self.ui.applyButton.enabled = False
-
-    # def onApplyButton(self) -> None:
-    #     """Run processing when user clicks "Apply" button."""
-    #     with slicer.util.tryWithErrorDisplay(_("Failed to compute results."), waitCursor=True):
-    #         # Compute output
-    #         self.logic.process(self.ui.inputSelector.currentNode(), self.ui.outputSelector.currentNode(),
-    #                            self.ui.imageThresholdSliderWidget.value, self.ui.invertOutputCheckBox.checked)
-
-    #         # Compute inverted output (if needed)
-    #         if self.ui.invertedOutputSelector.currentNode():
-    #             # If additional output volume is selected then result with inverted threshold is written there
-    #             self.logic.process(self.ui.inputSelector.currentNode(), self.ui.invertedOutputSelector.currentNode(),
-    #                                self.ui.imageThresholdSliderWidget.value, not self.ui.invertOutputCheckBox.checked, showResult=False)
-
-
-#
-# DMRI_TractographyLogic
-#
-
-
-class DMRI_TractographyLogic(ScriptedLoadableModuleLogic):
-    """This class should implement all the actual
-    computation done by your module.  The interface
-    should be such that other python code can import
-    this class and make use of the functionality without
-    requiring an instance of the Widget.
-    Uses ScriptedLoadableModuleLogic base class, available at:
-    https://github.com/Slicer/Slicer/blob/main/Base/Python/slicer/ScriptedLoadableModule.py
-    """
-
-    def __init__(self) -> None:
-        """Called when the logic class is instantiated. Can be used for initializing member variables."""
-        ScriptedLoadableModuleLogic.__init__(self)
-
-    def getParameterNode(self):
-        return DMRI_TractographyParameterNode(super().getParameterNode())
-
-    def process(self,
-                inputVolume: vtkMRMLScalarVolumeNode,
-                outputVolume: vtkMRMLScalarVolumeNode,
-                imageThreshold: float,
-                invert: bool = False,
-                showResult: bool = True) -> None:
-        """
-        Run the processing algorithm.
-        Can be used without GUI widget.
-        :param inputVolume: volume to be thresholded
-        :param outputVolume: thresholding result
-        :param imageThreshold: values above/below this threshold will be set to 0
-        :param invert: if True then values above the threshold will be set to 0, otherwise values below are set to 0
-        :param showResult: show output volume in slice viewers
-        """
-
-        if not inputVolume or not outputVolume:
-            raise ValueError("Input or output volume is invalid")
-
-        import time
-
-        startTime = time.time()
-        logging.info("Processing started")
-
-        # Compute the thresholded output volume using the "Threshold Scalar Volume" CLI module
-        cliParams = {
-            "InputVolume": inputVolume.GetID(),
-            "OutputVolume": outputVolume.GetID(),
-            "ThresholdValue": imageThreshold,
-            "ThresholdType": "Above" if invert else "Below",
-        }
-        cliNode = slicer.cli.run(slicer.modules.thresholdscalarvolume, None, cliParams, wait_for_completion=True, update_display=showResult)
-        # We don't need the CLI module node anymore, remove it to not clutter the scene with it
-        slicer.mrmlScene.RemoveNode(cliNode)
-
-        stopTime = time.time()
-        logging.info(f"Processing completed in {stopTime-startTime:.2f} seconds")
-
-
-#
-# DMRI_TractographyTest
-#
-
-
-class DMRI_TractographyTest(ScriptedLoadableModuleTest):
-    """
-    This is the test case for your scripted module.
-    Uses ScriptedLoadableModuleTest base class, available at:
-    https://github.com/Slicer/Slicer/blob/main/Base/Python/slicer/ScriptedLoadableModule.py
-    """
-
-    def setUp(self):
-        """Do whatever is needed to reset the state - typically a scene clear will be enough."""
-        slicer.mrmlScene.Clear()
-
-    def runTest(self):
-        """Run as few or as many tests as needed here."""
-        self.setUp()
-        self.test_DMRI_Tractography1()
-
-    def test_DMRI_Tractography1(self):
-        """Ideally you should have several levels of tests.  At the lowest level
-        tests should exercise the functionality of the logic with different inputs
-        (both valid and invalid).  At higher levels your tests should emulate the
-        way the user would interact with your code and confirm that it still works
-        the way you intended.
-        One of the most important features of the tests is that it should alert other
-        developers when their changes will have an impact on the behavior of your
-        module.  For example, if a developer removes a feature that you depend on,
-        your test should break so they know that the feature is needed.
-        """
-
-        self.delayDisplay("Starting the test")
-
-        # Get/create input data
-
-        import SampleData
-
-        registerSampleData()
-        inputVolume = SampleData.downloadSample("DMRI_Tractography1")
-        self.delayDisplay("Loaded test data set")
-
-        inputScalarRange = inputVolume.GetImageData().GetScalarRange()
-        self.assertEqual(inputScalarRange[0], 0)
-        self.assertEqual(inputScalarRange[1], 695)
-
-        outputVolume = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLScalarVolumeNode")
-        threshold = 100
-
-        # Test the module logic
-
-        logic = DMRI_TractographyLogic()
-
-        # Test algorithm with non-inverted threshold
-        logic.process(inputVolume, outputVolume, threshold, True)
-        outputScalarRange = outputVolume.GetImageData().GetScalarRange()
-        self.assertEqual(outputScalarRange[0], inputScalarRange[0])
-        self.assertEqual(outputScalarRange[1], threshold)
-
-        # Test algorithm with inverted threshold
-        logic.process(inputVolume, outputVolume, threshold, False)
-        outputScalarRange = outputVolume.GetImageData().GetScalarRange()
-        self.assertEqual(outputScalarRange[0], inputScalarRange[0])
-        self.assertEqual(outputScalarRange[1], inputScalarRange[1])
-
-        self.delayDisplay("Test passed")

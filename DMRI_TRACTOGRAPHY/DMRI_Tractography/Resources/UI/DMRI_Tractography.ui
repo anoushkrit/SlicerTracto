@@ -7,10 +7,24 @@
     <x>0</x>
     <y>0</y>
     <width>363</width>
-    <height>1072</height>
+    <height>1135</height>
    </rect>
   </property>
   <layout class="QVBoxLayout" name="verticalLayout">
+   <item>
+    <widget class="QCheckBox" name="sshConnectionCheckBox">
+     <property name="text">
+      <string>Use SSH Connection to compute</string>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QPushButton" name="sshConnectionButton">
+     <property name="text">
+      <string>Connect to SSH</string>
+     </property>
+    </widget>
+   </item>
    <item>
     <widget class="ctkCollapsibleButton" name="inputsCollapsibleButton">
      <property name="text">
