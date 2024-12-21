@@ -1,5 +1,5 @@
 import paramiko
-import config
+import SlicerTracto.DMRI_TRACTOGRAPHY.DMRI_Tractography.SSH_Connection.configuration as configuration
 
 class SSHConnection:
     _instance = None  # Singleton instance
@@ -12,11 +12,11 @@ class SSHConnection:
 
     def init(self):
         """Establish the SSH connection."""
-        self.hostname = config.hostname
-        self.port = config.port
-        self.username = config.username
-        self.password = config.password
-        self.private_key = config.private_key
+        self.hostname = configuration.hostname
+        self.port = configuration.port
+        self.username = configuration.username
+        self.password = configuration.password
+        self.private_key = configuration.private_key
         self.client = None
         self.ssh_status = False
         self.connect()
