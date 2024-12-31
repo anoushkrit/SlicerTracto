@@ -1,0 +1,5 @@
+# This directory is a Syncthing folder marker.
+# Do not delete.
+
+folderID: yyxw5-grapr
+created: 2024-12-19T22:26:21+05:30
