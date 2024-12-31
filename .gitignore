@@ -1,4 +1,4 @@
-/Input
-/Output
-/venv
-__pycache__
+Input/
+Output/
+venv/
+__pycache__/
