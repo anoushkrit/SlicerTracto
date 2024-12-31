@@ -2,3 +2,4 @@ Input/
 Output/
 venv/
 __pycache__/
+*.gz
