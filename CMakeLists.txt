@@ -4,7 +4,7 @@ project(SlicerTracto)
 
 #-----------------------------------------------------------------------------
 # Extension meta-information
-set(EXTENSION_HOMEPAGE "https://www.slicer.org/wiki/Documentation/Nightly/Extensions/MTP")
+set(EXTENSION_HOMEPAGE "https://www.slicer.org/wiki/Documentation/Nightly/Extensions/SlicerTracto")
 set(EXTENSION_CATEGORY "SlicerTracto")
 set(EXTENSION_CONTRIBUTORS "Gagan Gupta (IIT MANDI), Mahir Jain (IIT MANDI), Ankita Joshi (IIT MANDI), Anoushkrit Goel (IIT MANDI), Aditya Nigam (IIT MANDI)")
 set(EXTENSION_DESCRIPTION "The slicer extension is a specialized toolkit for advanced neuroimaging analysis. It features three core modules:
@@ -25,13 +25,8 @@ include(${Slicer_USE_FILE})
 
 #-----------------------------------------------------------------------------
 # Extension modules
-add_subdirectory(FirstModule)
-add_subdirectory(SecondModule)
-add_subdirectory(ThirdModule)
-add_subdirectory(segmentation)
-add_subdirectory(DipyTools)
-add_subdirectory(FourthModule)
-
+add_subdirectory(MTP)
+add_subdirectory(DMRI_Tractography)
 ## NEXT_MODULE
 
 #-----------------------------------------------------------------------------
