@@ -70,7 +70,7 @@ class GenerateFODF:
     
     def generateFodf(self):
         print("Generating fODF using local compute")
-        preproc_data_dir = "/Users/mahir/Desktop/SlicerTracto/MTP/outputs"
+        preproc_data_dir = "/Users/anoushkritgoel/Github/SlicerTracto/Output"
         
         try:
             # Ensure output directory exists

@@ -20,8 +20,9 @@ from scripts.scil_fodf_metrics import main as scil_fodf_metrics_main
 
 class SyncthingTractographyProcessor:
     def __init__(self, white_mask, diffusion, bvals, bvecs, output_dir):
-        self.local_input_dir = Path("/Users/mahir/Desktop/MTP/SlicerTracto-extension-with-integrated-modules/DMRI_TRACTOGRAPHY/Input")
-        self.local_output_dir = Path("/Users/mahir/Desktop/MTP/SlicerTracto-extension-with-integrated-modules/DMRI_TRACTOGRAPHY/Output")
+        self.local_input_dir = Path("/Users/anoushkritgoel/Github/SlicerTracto/Input")
+        self.local_output_dir = Path("/Users/anoushkritgoel/Github/SlicerTracto/Output")
+        self.ssh_key_path = "/Users/anoushkritgoel/.ssh/mahirj_param"
 
         self.remote_input_dir = Path("/scratch/mahirj.scee.iitmandi/DMRI_TRACTOGRAPHY/Input")
         self.remote_output_dir = Path("/scratch/mahirj.scee.iitmandi/DMRI_TRACTOGRAPHY/Output")
@@ -37,7 +38,8 @@ class SyncthingTractographyProcessor:
         self.remote_host = "paramhimalaya.iitmandi.ac.in"
         self.remote_port = 4422
         self.username = "mahirj.scee.iitmandi"
-        self.ssh_key_path = os.path.expanduser("~/.ssh/filename")
+        # self.ssh_key_path = os.path.expanduser("~/.ssh/filename")
+
         self.ssh_client = None
     
     def connect_ssh(self):
@@ -82,6 +84,11 @@ class SyncthingTractographyProcessor:
     def execute_remote_script(self):
         """Run the FODF pipeline script on the remote server."""
         print("Executing FODF pipeline on remote server...")
+
+        self.white_mask = os.path.basename(self.white_mask)
+        self.diffusion = os.path.basename(self.diffusion)
+        self.bvals = os.path.basename(self.bvals)
+        self.bvecs = os.path.basename(self.bvecs)
 
         conda_env_name = "slicer_env"
         command = (

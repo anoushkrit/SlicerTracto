@@ -194,17 +194,17 @@ class DMRI_TractographyWidget(ScriptedLoadableModuleWidget, VTKObservationMixin)
         # adding a UI button to switch from local to SSH
         self.ui.toggleImportButton.clicked.connect(self.toggleImport)
 
-        # Generate FODF Module Connections
-        self._connect_generate_fodf_module()
+        # # Generate FODF Module Connections
+        # self._connect_generate_fodf_module()
 
-        # Tractography Module Connections
-        self._connect_tractography_module()
+        # # Tractography Module Connections
+        # self._connect_tractography_module()
 
-        # Metric Analysis Module Connections
-        self._connect_metric_analysis_module()
+        # # Metric Analysis Module Connections
+        # self._connect_metric_analysis_module()
 
-        # Segmentation Module Connections
-        self._connect_segmentation_module()
+        # # Segmentation Module Connections
+        # self._connect_segmentation_module()
 
         # Make sure parameter node is initialized (needed for module reload)
         self.initializeParameterNode()

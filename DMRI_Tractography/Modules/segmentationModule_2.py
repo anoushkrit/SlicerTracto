@@ -7,7 +7,7 @@ import paramiko
 
 import slicer
 import random
-
+import shutil
 from dipy.io.streamline import load_tractogram
 from dipy.segment.clustering import QuickBundles
 from dipy.io.streamline import save_trk
@@ -23,8 +23,9 @@ DEFAULT_DIR = os.path.dirname(file_path)
 
 class SyncthingProcessor:
     def __init__(self, input_trk, output_dir, threshold):
-        self.local_input_dir = Path("/Users/mahir/Desktop/MTP/SlicerTracto-extension-with-integrated-modules/DMRI_TRACTOGRAPHY/Input")
-        self.local_output_dir = Path("/Users/mahir/Desktop/MTP/SlicerTracto-extension-with-integrated-modules/DMRI_TRACTOGRAPHY/Output")
+        self.local_input_dir = Path("/Users/anoushkritgoel/Github/SlicerTracto/Input")
+        self.local_output_dir = Path("/Users/anoushkritgoel/Github/SlicerTracto/Output")
+        self.ssh_key_path = "/Users/anoushkritgoel/.ssh/mahirj_param"
 
         self.remote_input_dir = Path("/scratch/mahirj.scee.iitmandi/DMRI_TRACTOGRAPHY/Input")
         self.remote_output_dir = Path("/scratch/mahirj.scee.iitmandi/DMRI_TRACTOGRAPHY/Output")
@@ -38,7 +39,7 @@ class SyncthingProcessor:
         self.remote_host = "paramhimalaya.iitmandi.ac.in"
         self.remote_port = 4422
         self.username = "mahirj.scee.iitmandi"
-        self.ssh_key_path = os.path.expanduser("~/.ssh/filename")
+
         self.ssh_client = None
     
     def connect_ssh(self):
@@ -59,6 +60,49 @@ class SyncthingProcessor:
         except Exception as e:
             slicer.util.showStatusMessage(f"SSH connection failed: {str(e)}")
             raise
+
+        
+    def copy_files_to_local_input(self):
+        """Copy input files to the local input directory."""
+        self.local_input_dir.mkdir(parents=True, exist_ok=True)
+        files = [self.input_trk]
+        for file in files:
+            destination = self.local_input_dir / Path(file).name
+            shutil.copy(file, destination)
+            print(f"Copied {file} to {destination}")
+
+    def wait_for_sync(self, target_dir, target_file, timeout=3600):
+        """Wait for a file to appear in the specified directory within the timeout."""
+        start_time = time.time()
+        target_path = target_dir / target_file
+        while not target_path.exists():
+            if time.time() - start_time > timeout:
+                raise TimeoutError(f"Synchronization timed out for {target_path}")
+            time.sleep(2)
+        print(f"File {target_path} is now available.")
+
+    def run_pipeline(self):
+        """Run the complete FODF processing pipeline."""
+        start_time = time.time()
+
+        # Connect to SSH
+        self.connect_ssh()
+
+        # Copy input files to local input directory
+        self.copy_files_to_local_input()
+
+        # Wait for synchronization to remote input directory
+        for file in [self.input_trk]:
+            self.wait_for_sync(self.remote_input_dir, Path(file).name)
+
+        # Execute remote script
+        self.execute_remote_script()
+
+        # Wait for output synchronization
+        self.ensure_output_sync()
+
+        elapsed_time = time.time() - start_time
+        print(f"Pipeline completed in {elapsed_time:.2f} seconds.")
     
     def verify_input_files(self):
         """Verify that required input files exist locally."""
@@ -130,29 +174,6 @@ class SyncthingProcessor:
 
         print(f"Output file {local_output_file} is now available locally.")
 
-   
-    def run_pipeline(self):
-        """Run the complete pipeline."""
-        try:
-            start_time = time.time()
-
-            # Connect to SSH
-            self.connect_ssh()
-
-            # Execute remote script
-            self.execute_remote_script()
-
-            # Ensure output synchronization
-            # self.ensure_output_sync()
-
-            elapsed_time = time.time() - start_time
-            slicer.util.showStatusMessage(f"Pipeline completed in {elapsed_time:.2f} seconds.")
-        except Exception as e:
-            slicer.util.errorDisplay(f"An error occurred: {e}")
-        finally:
-            if self.ssh_client:
-                self.ssh_client.close()
-                slicer.util.showStatusMessage("SSH connection closed.")
                 
 class Segmentation:
     def __init__(self):

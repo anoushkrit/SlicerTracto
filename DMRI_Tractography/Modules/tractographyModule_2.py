@@ -8,7 +8,7 @@ from dipy.io.streamline import load_tractogram
 from dipy.io.stateful_tractogram import StatefulTractogram, Space
 from vtk import vtkPolyDataReader
 import vtk
-
+import shutil
 
 # Get the path to the scilpy folder and add to sys paths
 sibling_folder_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'scilpy'))
@@ -20,8 +20,9 @@ DEFAULT_VTK_FILE_NAME = "result.vtk"
 
 class SyncthingTractographyProcessor:
     def __init__(self, seeding_mask_file, fodf_file, output_file, step_size, algotype):
-        self.local_input_dir = Path("/Users/mahir/Desktop/MTP/SlicerTracto-extension-with-integrated-modules/DMRI_TRACTOGRAPHY/Input")
-        self.local_output_dir = Path("/Users/mahir/Desktop/MTP/SlicerTracto-extension-with-integrated-modules/DMRI_TRACTOGRAPHY/Output")
+        self.local_input_dir = Path("/Users/anoushkritgoel/Github/SlicerTracto/Input")
+        self.local_output_dir = Path("/Users/anoushkritgoel/Github/SlicerTracto/Output")
+        self.ssh_key_path = "/Users/anoushkritgoel/.ssh/mahirj_param"
 
         self.remote_input_dir = Path("/scratch/mahirj.scee.iitmandi/DMRI_TRACTOGRAPHY/Input")
         self.remote_output_dir = Path("/scratch/mahirj.scee.iitmandi/DMRI_TRACTOGRAPHY/Output")
@@ -38,7 +39,7 @@ class SyncthingTractographyProcessor:
         self.remote_host = "paramhimalaya.iitmandi.ac.in"
         self.remote_port = 4422
         self.username = "mahirj.scee.iitmandi"
-        self.ssh_key_path = os.path.expanduser("~/.ssh/filename")
+
         self.ssh_client = None
     
     def connect_ssh(self):
@@ -50,7 +51,7 @@ class SyncthingTractographyProcessor:
         try:
             private_key = paramiko.RSAKey(filename=self.ssh_key_path)
             self.ssh_client.connect(
-                hostname=self.remote_host,
+                hostname=self.remote_host,  
                 port=self.remote_port,
                 username=self.username,
                 pkey=private_key
@@ -59,6 +60,25 @@ class SyncthingTractographyProcessor:
         except Exception as e:
             slicer.util.showStatusMessage(f"SSH connection failed: {str(e)}")
             raise
+        
+    def copy_files_to_local_input(self):
+        """Copy input files to the local input directory."""
+        # self.local_input_dir.mkdir(parents=True, exist_ok=True)
+        files = [self.seeding_mask_file, self.fodf_file]
+        for file in files:
+            destination = self.local_input_dir / Path(file).name
+            shutil.copy(file, destination)
+            print(f"Copied {file} to {destination}")
+
+    def wait_for_sync(self, target_dir, target_file, timeout=3600):
+        """Wait for a file to appear in the specified directory within the timeout."""
+        start_time = time.time()
+        target_path = target_dir / target_file
+        while not target_path.exists():
+            if time.time() - start_time > timeout:
+                raise TimeoutError(f"Synchronization timed out for {target_path}")
+            time.sleep(2)
+        print(f"File {target_path} is now available.")
     
     def verify_input_files(self):
         """Verify that required input files exist locally."""
@@ -73,6 +93,10 @@ class SyncthingTractographyProcessor:
         slicer.util.showStatusMessage("Executing remote script...")
 
         conda_env_name = "slicer_env"
+
+        self.seeding_mask_file = os.path.basename(self.seeding_mask_file)
+        self.fodf_file = os.path.basename(self.fodf_file)
+        self.output_file = os.path.basename(self.output_file)
 
         command = (
             f"source ~/.bashrc && "
@@ -133,27 +157,41 @@ class SyncthingTractographyProcessor:
 
    
     def run_pipeline(self):
-        """Run the complete pipeline."""
-        try:
-            start_time = time.time()
+        """Run the complete FODF processing pipeline."""
+        # try:
+        start_time = time.time()
 
-            # Connect to SSH
-            self.connect_ssh()
+        # Connect to SSH
+        self.connect_ssh()
+        # Copy input files to local input directory
+        
+        print("[SlicerTracto]: Connected to server ... Copying")
+        self.copy_files_to_local_input()
+        print("[SlicerTracto]: Copied files to server")
+        
+        # Wait for synchronization to remote input directory
+        # for file in [self.white_mask, self.diffusion, self.bvals, self.bvecs]:
+        #     self.wait_for_sync(self.remote_input_dir, Path(file).name)
+        
+        for file in [self.seeding_mask_file, self.fodf_file]:
+            print("[SlicerTracto]: Waiting for sync for file {}".format(file))
+            self.wait_for_sync(self.local_input_dir, Path(file).name)
+        
+        
+        # Execute remote script
+        self.execute_remote_script()
 
-            # Execute remote script
-            self.execute_remote_script()
+        # Wait for output synchronization
+        self.ensure_output_sync()
 
-            # Ensure output synchronization
-            self.ensure_output_sync()
-
-            elapsed_time = time.time() - start_time
-            slicer.util.showStatusMessage(f"Pipeline completed in {elapsed_time:.2f} seconds.")
-        except Exception as e:
-            slicer.util.errorDisplay(f"An error occurred: {e}")
-        finally:
-            if self.ssh_client:
-                self.ssh_client.close()
-                slicer.util.showStatusMessage("SSH connection closed.")
+        elapsed_time = time.time() - start_time
+        print(f"Pipeline completed in {elapsed_time:.2f} seconds.")
+        # # except Exception as e:
+        #     print(f"An error occurred: {e}")
+        # # finally:
+        #     if self.ssh_client:
+        #         self.ssh_client.close()
+        #         slicer.util.showStatusMessage("SSH connection closed.")
 
 class Tractography:
     def __init__(self):
@@ -163,7 +201,8 @@ class Tractography:
         self.algo: str = "det"
         self.trkPath : str = None
         self.outputText = None
-        self.output_trk_path = "/Users/mahir/Desktop/MTP/SlicerTracto-extension-with-integrated-modules/DMRI_TRACTOGRAPHY/Output/result.trk"
+        # self.output_trk_path = "/Users/mahir/Desktop/MTP/SlicerTracto-extension-with-integrated-modules/DMRI_TRACTOGRAPHY/Output/result.trk"
+        self.output_trk_path = "/Users/anoushkritgoel/Github/SlicerTracto/Output/result.trk"
 
     @staticmethod
     def _isValidPath(path: str) -> bool:
@@ -217,17 +256,13 @@ class Tractography:
         fodf_file = self.fodfPath
         output_file = self.trkPath
 
-        # print(f"Seeding Mask Path: {seeding_mask_file}")
-        # print(f"FODF File Path: {fodf_file}")
-        # print(f"Output File Path: {output_file}")
-
         step_size = self.stepSize
         algotype = self.algo
 
         processor = SyncthingTractographyProcessor(
-            seeding_mask_file=os.path.basename(seeding_mask_file),
-            fodf_file=os.path.basename(fodf_file),
-            output_file=os.path.basename(output_file),
+            seeding_mask_file=seeding_mask_file,
+            fodf_file=fodf_file,
+            output_file=output_file,
             step_size=step_size,
             algotype=algotype
         )
